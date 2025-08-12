@@ -2,293 +2,196 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Quick Height — Camera Measure</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Hold to Scan — Height (WebXR)</title>
+<meta name="theme-color" content="#0ea5e9" />
 <style>
   :root{
-    --bg:#0b0f14; --card:#121823; --text:#e6ebf2; --muted:#8ea1b5; --brand:#ffd166;
-    --ok:#2dd4bf; --warn:#f59e0b; --err:#ef4444;
+    --bg:#070b12; --panel:#0b1220; --ink:#e6edf6; --muted:#9fb0c3; --brand:#0ea5e9; --ok:#22c55e; --bad:#ef4444;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-  header{position:sticky;top:0;background:linear-gradient(180deg,#0b0f14,rgba(11,15,20,.7));border-bottom:1px solid #1e2836;z-index:9}
-  .wrap{max-width:980px;margin:0 auto;padding:16px}
-  h1{margin:0;font-size:20px;letter-spacing:.3px}
-  .pill{display:inline-flex;align-items:center;gap:6px;background:#1a2432;border:1px solid #243142;border-radius:999px;padding:6px 10px;color:var(--muted);font-size:12px}
-  main{padding:24px 12px 80px}
-  .tool{background:var(--card);border:1px solid #1e2836;border-radius:14px;padding:16px}
-  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-  button,.btn{
-    appearance:none;border:0;border-radius:12px;padding:12px 16px;font-weight:600;
-    background:#1f2937;color:#e5e7eb;cursor:pointer
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto}
+  .hud{position:fixed;inset:0;pointer-events:none;display:grid;place-items:center}
+  .ring{width:140px;height:140px;border-radius:50%;border:3px solid rgba(255,255,255,.12);position:relative}
+  .ring::after{content:"";position:absolute;inset:6px;border-radius:50%;border:2px dashed rgba(255,255,255,.15)}
+  .cross{position:absolute;left:50%;top:50%;width:18px;height:18px;transform:translate(-50%,-50%);opacity:.8}
+  .cross::before,.cross::after{content:"";position:absolute;background:rgba(255,255,255,.85)}
+  .cross::before{left:50%;top:0;width:2px;height:100%;transform:translateX(-50%)}
+  .cross::after{top:50%;left:0;width:100%;height:2px;transform:translateY(-50%)}
+  .toast{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(6px);
+         padding:10px 14px;border-radius:12px;color:var(--ink);font-size:13px}
+  .panel{position:fixed;left:12px;right:12px;top:12px;display:flex;gap:8px;align-items:center;justify-content:space-between;
+         background:rgba(7,11,18,.8);border:1px solid rgba(255,255,255,.08);backdrop-filter:blur(6px);padding:10px 12px;border-radius:12px}
+  .badge{font-size:12px;color:var(--muted)}
+  .readout{font-weight:800}
+  .btn{
+    position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
+    appearance:none;border:0;border-radius:999px;padding:14px 22px;font-weight:800;letter-spacing:.4px;
+    background:var(--brand);color:#071119;box-shadow:0 8px 30px rgba(14,165,233,.25);cursor:pointer
   }
-  button.primary{background:var(--brand);color:#1a1a1a}
-  button.ghost{background:#121823;border:1px solid #263244}
-  input[type="number"],input[type="text"],select{
-    width:100%;background:#0f141c;border:1px solid #243142;color:var(--text);
-    border-radius:12px;padding:10px 12px
-  }
-  label{font-size:13px;color:var(--muted)}
-  .grid{display:grid;grid-template-columns:1fr;gap:12px}
-  @media(min-width:880px){.grid{grid-template-columns:320px 1fr}}
-  .panel{background:#0f141c;border:1px solid #1f2a3b;border-radius:12px;padding:12px}
-  canvas{width:100%;height:auto;background:#000;border-radius:12px;border:1px solid #1e2836}
-  .hint{font-size:13px;color:var(--muted)}
-  .chip{display:inline-block;background:#0e1622;border:1px dashed #2a3a52;color:#9cb3cc;padding:6px 8px;border-radius:10px;font-size:12px}
-  .steps{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0}
-  .steps .chip.active{border-style:solid;background:#112033;color:#d7e6ff}
-  .result{font-weight:800;font-size:22px}
-  .legend{display:flex;gap:12px;align-items:center;font-size:12px;color:#b8c6d8}
-  .swatch{width:12px;height:12px;border-radius:3px;display:inline-block;margin-right:6px}
-  .s1{background:#22d3ee}.s2{background:#f43f5e}
-  footer{position:fixed;inset:auto 0 0 0;background:linear-gradient(0deg,#0b0f14,rgba(11,15,20,.7));border-top:1px solid #1e2836}
-  .foot{max-width:980px;margin:auto;padding:10px 12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+  .btn:active{transform:translateX(-50%) scale(.98)}
+  .holdTip{position:fixed;left:50%;bottom:72px;transform:translateX(-50%);color:var(--muted);font-size:12px}
+  .hidden{display:none}
+  .fallback{max-width:720px;margin:18vh auto;padding:20px;background:var(--panel);border:1px solid rgba(255,255,255,.08);border-radius:16px}
+  code{background:#0f172a;padding:2px 6px;border-radius:6px}
 </style>
 </head>
 <body>
-<header>
-  <div class="wrap row" style="justify-content:space-between">
-    <h1>Quick Height</h1>
-    <span class="pill">Snap → Tap points → Get height</span>
+
+<!-- Top status panel -->
+<div class="panel" id="topPanel">
+  <div class="badge">Mode: <span id="mode">Idle</span></div>
+  <div class="badge">Height: <span class="readout" id="height">—</span></div>
+</div>
+
+<!-- Reticle HUD -->
+<div class="hud" id="hud">
+  <div class="ring">
+    <div class="cross"></div>
   </div>
-</header>
+</div>
 
-<main class="wrap grid">
-  <!-- Left controls -->
-  <section class="tool">
-    <div class="row">
-      <label class="chip">Tip: Stand the object beside a known item (A4 paper or a credit card).</label>
-    </div>
-    <div class="panel" style="margin-top:10px">
-      <div class="row" style="align-items:flex-end">
-        <div style="flex:1">
-          <label for="photo">1) Take or upload photo</label>
-          <input id="photo" type="file" accept="image/*" capture="environment">
-        </div>
-        <button id="clearBtn" class="ghost">Reset points</button>
-      </div>
-      <div style="margin-top:12px">
-        <label>2) Choose reference</label>
-        <div class="row">
-          <button class="ghost" data-ref="A4">A4 paper (297 mm)</button>
-          <button class="ghost" data-ref="CARD">Credit card (85.6 mm)</button>
-          <button class="ghost" data-ref="CUSTOM">Custom</button>
-        </div>
-        <div id="customWrap" style="margin-top:10px;display:none" class="row">
-          <div style="flex:1">
-            <label>Enter reference length</label>
-            <input id="customLen" type="number" step="0.1" placeholder="e.g. 120">
-          </div>
-          <div style="width:130px">
-            <label>Units</label>
-            <select id="customUnit">
-              <option value="mm">mm</option>
-              <option value="cm">cm</option>
-              <option value="m">m</option>
-            </select>
-          </div>
-        </div>
-      </div>
+<!-- Hold to scan button -->
+<button id="hold" class="btn hidden">HOLD TO SCAN</button>
+<div class="holdTip hidden" id="tip">Aim at the BASE ➜ hold ➜ tilt to TOP ➜ release</div>
 
-      <div style="margin-top:12px">
-        <label>3) Mark points in the photo</label>
-        <div class="steps">
-          <span class="chip active" id="stepLabel">Step 1/4 — Tap the <b>TOP</b> of the object</span>
-        </div>
-        <div class="legend" style="margin-top:6px">
-          <span><i class="swatch s1"></i>Object line</span>
-          <span><i class="swatch s2"></i>Reference line</span>
-        </div>
-      </div>
+<!-- Toast -->
+<div id="toast" class="toast hidden"></div>
 
-      <div style="margin-top:12px">
-        <label>4) Units for result</label>
-        <select id="unitOut">
-          <option value="cm">cm</option>
-          <option value="m">m</option>
-          <option value="in">in</option>
-          <option value="ft">ft</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="panel" style="margin-top:12px">
-      <div>Estimated height:</div>
-      <div class="result" id="result">—</div>
-      <div class="hint" id="hint">Load a photo, set a reference, then tap top & bottom of the object and the two ends of your reference.</div>
-    </div>
-  </section>
-
-  <!-- Right canvas -->
-  <section class="panel">
-    <canvas id="canvas"></canvas>
-  </section>
-</main>
-
-<footer>
-  <div class="foot">
-    <div class="hint">Accuracy depends on the photo being flat-on and the reference being in the same plane as the object.</div>
-    <button class="primary" id="saveBtn">Save result snapshot</button>
-  </div>
-</footer>
+<!-- Fallback for unsupported -->
+<div id="fallback" class="fallback hidden">
+  <h2>AR not supported here (yet)</h2>
+  <p>This “hold to scan” height tool needs <strong>WebXR + ARCore</strong> (Android Chrome). iOS Safari doesn’t expose WebXR.</p>
+  <p>Try on an Android device with Chrome, or use our manual photo tool with a reference object.</p>
+  <p class="badge">Tip: If you’re on Android and still see this, update Chrome and enable camera permissions.</p>
+</div>
 
 <script>
-(function(){
-  const fileEl = document.getElementById('photo');
-  const c = document.getElementById('canvas');
-  const ctx = c.getContext('2d');
-  const stepLabel = document.getElementById('stepLabel');
-  const resultEl = document.getElementById('result');
-  const hintEl = document.getElementById('hint');
-  const clearBtn = document.getElementById('clearBtn');
-  const saveBtn = document.getElementById('saveBtn');
-  const unitOut = document.getElementById('unitOut');
+(async () => {
+  const modeEl = document.getElementById('mode');
+  const heightEl = document.getElementById('height');
+  const toast = document.getElementById('toast');
+  const fallback = document.getElementById('fallback');
+  const holdBtn = document.getElementById('hold');
+  const tipEl = document.getElementById('tip');
 
-  // Reference selection
-  let refLenMM = null;
-  const customWrap = document.getElementById('customWrap');
-  const customLen = document.getElementById('customLen');
-  const customUnit = document.getElementById('customUnit');
+  // Feature detect
+  const supported = navigator.xr && await navigator.xr.isSessionSupported?.('immersive-ar');
+  if (!supported) {
+    fallback.classList.remove('hidden');
+    return;
+  }
 
-  document.querySelectorAll('[data-ref]').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      const mode = btn.dataset.ref;
-      if(mode==='A4'){ refLenMM = 297; customWrap.style.display='none'; }
-      if(mode==='CARD'){ refLenMM = 85.6; customWrap.style.display='none'; }
-      if(mode==='CUSTOM'){ customWrap.style.display='flex'; refLenMM = null; }
-      if(mode!=='CUSTOM'){
-        hintEl.textContent = 'Reference length set. Now tap points in the photo.';
-      }
-      draw();
+  let xrSession, xrRefSpace, viewerSpace, hitSource;
+  let scanning = false;
+  let baseY = null;        // world-space Y at the base (first frames while holding)
+  let lastTopY = null;     // last seen Y while tilting up
+  let rafId = null;
+
+  function showToast(msg, ms=1600){
+    toast.textContent = msg;
+    toast.classList.remove('hidden');
+    clearTimeout(showToast.t);
+    showToast.t = setTimeout(()=>toast.classList.add('hidden'), ms);
+  }
+
+  async function startAR(){
+    xrSession = await navigator.xr.requestSession('immersive-ar', {
+      requiredFeatures: ['hit-test', 'anchors'],
+      optionalFeatures: ['dom-overlay', 'plane-detection', 'unbounded'],
+      domOverlay: { root: document.body }
     });
+    xrRefSpace = await xrSession.requestReferenceSpace('local');
+    viewerSpace = await xrSession.requestReferenceSpace('viewer');
+    const hitTestSource = await xrSession.requestHitTestSource({ space: viewerSpace });
+    hitSource = hitTestSource;
+
+    xrSession.addEventListener('end', () => {
+      cancelAnimationFrame(rafId);
+      holdBtn.classList.add('hidden');
+      tipEl.classList.add('hidden');
+      modeEl.textContent = 'Ended';
+    });
+
+    modeEl.textContent = 'Ready';
+    holdBtn.classList.remove('hidden');
+    tipEl.classList.remove('hidden');
+
+    function onFrame(t, frame){
+      const session = frame.session;
+      const pose = frame.getViewerPose(xrRefSpace);
+      if (pose && hitSource){
+        const hits = frame.getHitTestResults(hitSource);
+        if (hits.length && scanning){
+          // Use the first hit (closest) — world matrix -> position
+          const hit = hits[0];
+          const hitPose = hit.getPose(xrRefSpace);
+          const y = hitPose.transform.position.y;
+
+          // Initialize baseY at the start of hold (first few frames)
+          if (baseY === null){
+            baseY = y; // assume pointing at base/floor
+          }
+          lastTopY = y; // update continuously while user tilts up
+          const delta = Math.abs(lastTopY - baseY);
+          heightEl.textContent = formatMeters(delta);
+        }
+      }
+      rafId = session.requestAnimationFrame(onFrame);
+    }
+    rafId = xrSession.requestAnimationFrame(onFrame);
+  }
+
+  function formatMeters(m){
+    // Guard weird reads
+    if (!isFinite(m) || m < 0) return '—';
+    // Clamp silly values
+    const cm = m * 100;
+    if (cm < 1) return `${(m*1000).toFixed(0)} mm`;
+    if (m < 1) return `${cm.toFixed(1)} cm`;
+    const feet = m * 3.28084;
+    const inches = feet * 12;
+    const ft = Math.floor(feet);
+    const inch = Math.round(inches - ft*12);
+    return `${m.toFixed(2)} m  (${ft}′ ${inch}″)`;
+  }
+
+  // Hold gesture
+  let pressing = false;
+  holdBtn.addEventListener('pointerdown', ()=>{
+    if (!xrSession) return;
+    pressing = true;
+    scanning = true;
+    baseY = null;
+    lastTopY = null;
+    modeEl.textContent = 'Scanning…';
+    showToast('Aim at BASE, tilt to TOP, then release', 1200);
   });
 
-  // Image state
-  let img = new Image();
-  let imgW=0,imgH=0;
-  function fitCanvas(){
-    if(!imgW||!imgH) return;
-    const maxW = Math.min(window.innerWidth-24, 980-24);
-    const pad = 0;
-    const w = Math.min(maxW, imgW);
-    const scale = w / imgW;
-    c.width = w;
-    c.height = Math.round(imgH*scale);
-    draw();
-  }
-  window.addEventListener('resize', fitCanvas);
-
-  // Points: [objTop, objBottom, refA, refB]
-  const pts = [];
-  function resetPoints(){
-    pts.length=0;
-    stepLabel.textContent = 'Step 1/4 — Tap the TOP of the object';
-    stepLabel.classList.add('active');
-    resultEl.textContent = '—';
-    draw();
-  }
-  clearBtn.addEventListener('click', resetPoints);
-
-  // Load image
-  fileEl.addEventListener('change', e=>{
-    const f = e.target.files[0];
-    if(!f) return;
-    const url = URL.createObjectURL(f);
-    img.onload = ()=>{
-      imgW = img.naturalWidth; imgH = img.naturalHeight;
-      fitCanvas(); resetPoints();
-      hintEl.textContent = 'Tap top & bottom of object, then the two ends of the reference.';
-    };
-    img.src = url;
-  });
-
-  // Canvas click to add points
-  c.addEventListener('click', e=>{
-    if(!imgW) return;
-    const rect = c.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    pts.push({x,y});
-    const steps = [
-      'Step 2/4 — Tap the BOTTOM of the object',
-      'Step 3/4 — Tap one END of the reference',
-      'Step 4/4 — Tap the OTHER end of the reference',
-      'Done — You can reset to measure again'
-    ];
-    stepLabel.textContent = steps[Math.min(pts.length-1,3)];
-    if(pts.length>=4){ stepLabel.classList.remove('active'); compute(); }
-    draw();
-  });
-
-  function draw(){
-    if(!imgW){ ctx.clearRect(0,0,c.width,c.height); return; }
-    // draw image
-    ctx.clearRect(0,0,c.width,c.height);
-    ctx.drawImage(img,0,0,c.width,c.height);
-    // draw points/lines
-    if(pts[0]&&pts[1]){
-      drawLine(pts[0], pts[1], '#22d3ee', 3);
-      drawDot(pts[0],'#22d3ee'); drawDot(pts[1],'#22d3ee');
-    }
-    if(pts[2]&&pts[3]){
-      drawLine(pts[2], pts[3], '#f43f5e', 3);
-      drawDot(pts[2],'#f43f5e'); drawDot(pts[3],'#f43f5e');
-    }
-  }
-  function drawLine(a,b,col,w){
-    ctx.strokeStyle=col; ctx.lineWidth=w; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
-  }
-  function drawDot(p,col){
-    ctx.fillStyle=col; ctx.beginPath(); ctx.arc(p.x,p.y,5,0,Math.PI*2); ctx.fill();
-  }
-
-  // Compute height using pixel ratio vs reference
-  function pxDist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
-  function toMM(value, unit){
-    if(unit==='mm') return value;
-    if(unit==='cm') return value*10;
-    if(unit==='m') return value*1000;
-    return value;
-  }
-  function fromMM(mm, out){
-    if(out==='cm') return mm/10;
-    if(out==='m') return mm/1000;
-    if(out==='in') return mm/25.4;
-    if(out==='ft') return mm/304.8;
-    return mm;
-  }
-
-  function compute(){
-    if(pts.length<4){ return; }
-    let refMM = refLenMM;
-    if(!refMM && customLen.value){
-      refMM = toMM(parseFloat(customLen.value), customUnit.value || 'mm');
-    }
-    if(!refMM){
-      resultEl.textContent = 'Set a reference first';
+  holdBtn.addEventListener('pointerup', ()=>{
+    if (!xrSession) return;
+    pressing = false;
+    scanning = false;
+    modeEl.textContent = 'Measured';
+    if (baseY === null || lastTopY === null){
+      showToast('Didn’t catch a surface — try again closer to the base', 1800);
+      heightEl.textContent = '—';
       return;
     }
-    const objPx = pxDist(pts[0], pts[1]);
-    const refPx = pxDist(pts[2], pts[3]);
-    if(refPx<2){ resultEl.textContent='Reference too small in photo'; return; }
-
-    const mmPerPx = refMM / refPx;
-    const objMM = objPx * mmPerPx;
-    const outUnit = unitOut.value;
-    const outVal = fromMM(objMM, outUnit);
-
-    resultEl.textContent = `${outVal.toFixed(outUnit==='m' ? 3 : 2)} ${outUnit}`;
-    hintEl.textContent = 'Tip: Keep camera square to the object. Put the reference in the same plane as the object for best accuracy.';
-  }
-
-  // Save annotated snapshot
-  saveBtn.addEventListener('click', ()=>{
-    if(!imgW){ return; }
-    const a = document.createElement('a');
-    a.href = c.toDataURL('image/png');
-    a.download = 'quick-height.png';
-    a.click();
+    const h = Math.abs(lastTopY - baseY);
+    heightEl.textContent = formatMeters(h);
+    showToast('Saved height ✓');
   });
+
+  // Kick off AR session
+  try {
+    await startAR();
+  } catch (e){
+    console.error(e);
+    fallback.classList.remove('hidden');
+    showToast('AR session failed. Try Chrome on Android with ARCore.', 2600);
+  }
 })();
 </script>
 </body>
